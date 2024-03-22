@@ -1,0 +1,28 @@
+name: Zip Folders on Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  zip_folders:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: List modified folders
+      id: modified_folders
+      run: |
+        git diff --name-only ${{ github.event.release.target_commitish }} HEAD | grep '/' | cut -d/ -f1 | sort -u > modified_folders.txt
+
+    - name: Create and upload zip files
+      run: |
+        while IFS= read -r folder; do
+          zip -r "$folder.zip" "$folder"/* -x "$folder"/*
+          mv "$folder.zip" "$folder-${{ github.event.release.tag_name }}.zip"
+          echo "Created and uploaded $folder-${{ github.event.release.tag_name }}.zip"
+        done < modified_folders.txt
+        rm modified_folders.txt
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
