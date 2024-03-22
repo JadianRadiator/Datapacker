@@ -1,57 +1,28 @@
-name: Create Release
+name: Zip Folders on Release
+
 on:
-  push:
-    branches:
-      - main  # Adjust this to your main branch name
+  release:
+    types: [published]
 
 jobs:
-  build:
+  zip_folders:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Set up Node.js 20
-      uses: actions/setup-node@v2
-      with:
-        node-version: '20'
-
-    - name: Checkout repository
+    - name: Checkout code
       uses: actions/checkout@v2
-      with:
-        submodules: 'recursive'
+
+    - name: List modified folders
+      id: modified_folders
+      run: |
+        git diff --name-only ${{ github.event.release.target_commitish }} HEAD | grep '/' | cut -d/ -f1 | sort -u > modified_folders.txt
+
+    - name: Create and upload zip files
+      run: |
+        while IFS= read -r folder; do
+          zip -r "$folder.zip" "$folder"/* -x "$folder"/*
+          mv "$folder.zip" "$folder-${{ github.event.release.tag_name }}.zip"
+          echo "Created and uploaded $folder-${{ github.event.release.tag_name }}.zip"
+        done < modified_folders.txt
+        rm modified_folders.txt
       env:
-        NODE_VERSION: '20'
-
-    - name: Set up Git
-      run: |
-        git config --global user.name 'JadianRadiator'
-        git config --global user.email 'jadianradiator@gmail.com'
-      
-    - name: Create and zip releases
-      run: |
-        # Function to zip the contents of a folder
-        function zip_folder_contents {
-            local folder="$1"
-            local zip_filename="$folder.zip"
-            pushd "$folder" >/dev/null || return
-            zip -r "../$zip_filename" .
-            popd >/dev/null || return
-        }
-
-        # Check if there are any folders to zip
-        if [ -d */ ]; then
-            # Loop through each directory in the repository
-            for folder in */; do
-                folder="${folder%/}" # Remove trailing slash
-                zip_folder_contents "$folder"
-            done
-
-            echo "Zip archives created successfully."
-        else
-            echo "No folders found to zip."
-        fi
-      
-    - name: Commit and push changes
-      run: |
-        git add *.zip
-        git commit -m "Create release zip files"
-        git push
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
