@@ -19,7 +19,9 @@ jobs:
     - name: Create and upload zip files
       run: |
         while IFS= read -r folder; do
-          zip -r "$folder.zip" "$folder"/* -x "$folder"/*
+          cd "$folder" || exit
+          zip -r "../$folder.zip" . -x "*/$folder/*" "*_$folder.zip"
+          cd ..
           mv "$folder.zip" "$folder-${{ github.event.release.tag_name }}.zip"
           echo "Created and uploaded $folder-${{ github.event.release.tag_name }}.zip"
         done < modified_folders.txt
